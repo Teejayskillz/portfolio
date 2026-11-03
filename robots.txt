@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /includes/
+Disallow: /storage/
+Disallow: /templates/
+Disallow: /tools/
+Disallow: /install.php
+Disallow: /contact.php
+Disallow: /thank-you.php
+Disallow: /*?preview=1
+
+Sitemap: https://tijanidev.com.ng/sitemap.xml

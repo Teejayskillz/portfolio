@@ -1,0 +1,95 @@
+# ===========================================================================
+# Tijani.dev — Apache configuration for shared cPanel hosting
+# ===========================================================================
+# Notes
+#  * If the site is installed in a sub-directory, Apache still applies these
+#    rules relative to that directory. Only ErrorDocument needs an absolute
+#    path, so adjust "/404.php" there if you deploy below the domain root.
+#  * Never remove the blocks that deny access to includes/, storage/,
+#    templates/ and tools/: they hold configuration, the SQLite database and
+#    PHP-only templates.
+# ===========================================================================
+
+<IfModule mod_autoindex.c>
+    Options -Indexes
+</IfModule>
+
+DirectoryIndex index.php
+
+ErrorDocument 404 /404.php
+
+# ---------------------------------------------------------------------------
+# Clean URLs + private directory protection
+# ---------------------------------------------------------------------------
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Public routes
+    RewriteRule ^projects/?$ projects.php [L,QSA]
+    RewriteRule ^project/([A-Za-z0-9_-]+)/?$ project.php?slug=$1 [L,QSA]
+    RewriteRule ^contact/?$ contact.php [L,QSA]
+    RewriteRule ^thank-you/?$ thank-you.php [L,QSA]
+    RewriteRule ^sitemap\.xml$ sitemap.php [L]
+    RewriteRule ^admin$ admin/ [R=301,L]
+
+    # Hard block: application internals are never served directly
+    RewriteRule ^(includes|storage|templates|tools|admin/includes)(/|$) - [F,NC,L]
+
+    # Hard block: dotfiles except .well-known
+    RewriteRule (^|/)\.(?!well-known) - [F,L]
+</IfModule>
+
+# ---------------------------------------------------------------------------
+# Deny hidden files (belt and braces for hosts without mod_rewrite)
+# ---------------------------------------------------------------------------
+<FilesMatch "^\.(?!well-known)">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# ---------------------------------------------------------------------------
+# Response headers
+# ---------------------------------------------------------------------------
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+
+    <FilesMatch "\.(css|js|png|jpe?g|webp|svg|woff2?|ttf|eot)$">
+        Header set Cache-Control "public, max-age=2592000"
+    </FilesMatch>
+
+    <FilesMatch "\.php$">
+        Header set Cache-Control "no-store, no-cache, must-revalidate"
+    </FilesMatch>
+</IfModule>
+
+# ---------------------------------------------------------------------------
+# Compression
+# ---------------------------------------------------------------------------
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/css text/xml
+    AddOutputFilterByType DEFLATE application/javascript application/json
+    AddOutputFilterByType DEFLATE application/xml image/svg+xml
+</IfModule>
+
+# ---------------------------------------------------------------------------
+# Cache lifetimes
+# ---------------------------------------------------------------------------
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+    ExpiresByType image/jpeg "access plus 1 month"
+    ExpiresByType image/png "access plus 1 month"
+    ExpiresByType image/webp "access plus 1 month"
+    ExpiresByType image/svg+xml "access plus 1 month"
+    ExpiresByType font/woff2 "access plus 1 year"
+    ExpiresByType text/html "access plus 0 seconds"
+</IfModule>

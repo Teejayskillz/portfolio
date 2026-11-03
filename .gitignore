@@ -1,0 +1,30 @@
+# ---------------------------------------------------------------------------
+# Local / runtime files that must never be committed
+# ---------------------------------------------------------------------------
+/includes/config.local.php
+/storage/*.sqlite
+/storage/*.sqlite-*
+/storage/*.key
+/storage/*.lock
+/storage/logs/*
+!/storage/logs/.gitkeep
+/storage/sessions/*
+!/storage/sessions/.gitkeep
+/storage/backups/*
+!/storage/backups/.gitkeep
+
+# Uploaded project media (kept on the server, not in Git)
+/assets/uploads/projects/*
+!/assets/uploads/projects/.gitkeep
+
+# Local testing + preview artefacts
+/tools/tmp/
+/.preview-*.html
+*.log
+*.tmp
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
