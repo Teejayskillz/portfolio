@@ -162,7 +162,7 @@ if (!$installed && is_post() && $criticalOk) {
         <a class="brand" href="<?= e(home_url()) ?>" aria-label="<?= e(config('owner.name')) ?> — home">
             <span class="brand__mark" aria-hidden="true">TA</span>
             <span class="brand__text">
-                <strong>Tijani<span class="brand__accent">.</span>dev</strong>
+                <strong>Tijani<span class="brand__accent">Dev</span></strong>
                 <small>Portfolio installer</small>
             </span>
         </a>

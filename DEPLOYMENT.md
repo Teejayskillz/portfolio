@@ -59,6 +59,8 @@ cPanel → File Manager → right-click → **Change Permissions**:
 | `storage/logs/`, `storage/sessions/` | `0750` | created automatically, must be writable |
 | `assets/uploads/` | `0755` | public images, must be writable |
 | `assets/uploads/projects/` | `0755` | created automatically |
+| `storage/backups/` | `0700` | automatic pre-restore safety copies |
+| `storage/restore/` | `0700` | temporary upload staging |
 | PHP files | `0644` | never 0777 |
 
 If uploads fail, confirm the PHP user owns/writes these directories. On cPanel the account
@@ -198,6 +200,7 @@ sitemap all read the database.
       `admin/includes/.htaccess` all present (Admin → System shows this).
 - [ ] Admin password changed and unique; no `admin/admin` login works.
 - [ ] Contact form tested; SPF/DKIM configured; failure path verified.
+- [ ] Backup downloaded once and a restore tested with a throwaway copy.
 - [ ] Admin → System shows every environment row green.
 - [ ] cPanel account backups enabled.
 
@@ -208,19 +211,52 @@ addition to the app login, or restrict it to your IP with `.htaccess`.
 
 ## 11. Backups and restore
 
-**Download the database:** Admin → **System & backup** → *Download database backup*. This
-checkpoints SQLite's WAL and streams a `.sqlite` file.
+### Download a backup
+
+Admin → **System & backup** → *Download database backup*. This checkpoints SQLite's WAL and
+streams a `.sqlite` file named `portfolio-YYYYMMDD-HHMMSS.sqlite`.
 
 **Full backup:** cPanel → **Backup** (or your host's nightly backup) covers files + database.
 Include `assets/uploads/` — the SQLite file alone does not contain the images.
 
-**Restore:**
+### Restore by uploading a backup (built-in)
 
-1. Put the site in maintenance or close the admin session.
-2. Delete `storage/portfolio.sqlite-wal` and `storage/portfolio.sqlite-shm` if present.
-3. Replace `storage/portfolio.sqlite` with the backup (permissions `0600`).
-4. Restore `assets/uploads/` alongside it so image paths resolve.
-5. Sign in and open **Projects** to confirm the rows and images load.
+Admin → **System & backup** → *Restore from backup* (direct URL: `/admin/restore.php`).
+
+1. Tick the confirmation box and choose the `.sqlite` file downloaded from this site.
+2. The server validates the upload **before touching anything**:
+   * real SQLite magic bytes (the extension alone is not trusted);
+   * `PRAGMA integrity_check` must return `ok`;
+   * required tables, at least one usable admin account, no triggers;
+   * `PRAGMA foreign_key_check` must be clean;
+   * `app_meta.schema_version` must match the deployed version.
+3. The live database is copied to `storage/backups/pre-restore-…sqlite` first.
+4. The current file is moved aside, the upload is moved in, and the restored file is
+   integrity-checked again. Any failure puts the previous database back automatically.
+5. On success you are returned to **System** with the project count and the safety-copy name.
+6. If the backup comes from a **different installation**, its admin account may not match your
+   session. You are signed out and must use the admin credentials that belong to that backup.
+
+**Images are not in the database.** Restore `assets/uploads/` separately (cPanel Backup or
+File Manager) or project cards will show missing images.
+
+**Safety copies** stay in `storage/backups` and are listed on the restore page with a download
+link. The newest 10 are kept (`'backup' => ['keep' => 10]` in `includes/config.local.php`).
+
+**Size limits:** the restore tool accepts up to 100 MB
+(`backup.max_restore_bytes`), but PHP's own limits apply first. If a large upload is rejected
+before validation, raise `upload_max_filesize` and `post_max_size` in cPanel → **MultiPHP INI
+Editor** (or restore manually, below).
+
+### Manual restore (fallback)
+
+1. Download a copy of the current `storage/portfolio.sqlite`.
+2. Sign out of the dashboard.
+3. Delete `storage/portfolio.sqlite-wal` and `storage/portfolio.sqlite-shm` if present.
+4. Upload the backup as `storage/portfolio.sqlite` (permissions `0600`).
+5. Restore `assets/uploads/` alongside it so image paths resolve.
+6. Sign in and open **Projects** to confirm the rows and images load.
+7. Take a fresh backup from the dashboard once everything looks right.
 
 ---
 
@@ -238,6 +274,12 @@ Include `assets/uploads/` — the SQLite file alone does not contain the images.
 | “Too many sign-in attempts” | Throttling | Wait 15 minutes; failures are pruned automatically |
 | CSS changes not visible | Browser cache | Hard refresh; static assets are cached one month by `.htaccess` |
 | Images broken after move | Uploads moved/not copied | Restore `assets/uploads/` (paths are stored relative to it) |
+| Restore: “not a SQLite database” | Wrong file (often a `.sql` dump or HTML page) | Use the `.sqlite` file from System & backup, not a phpMyAdmin export |
+| Restore: “schema version … expects …” | Backup comes from another app version or another portfolio | Deploy the matching version, or restore the data manually after migration |
+| Restore: “live database is locked” | Another request/process holds the SQLite file | Close other admin tabs, wait a few seconds, retry; avoid restoring during heavy traffic |
+| Restore upload rejected as too large | PHP `upload_max_filesize`/`post_max_size` lower than the DB | Raise them in MultiPHP INI Editor, or use the manual file replacement steps |
+| Restore succeeded but images are missing | Uploads are not part of the database | Restore `assets/uploads/` from the same date |
+| Safety copy missing from the list | Retention (`backup.keep`) or manual deletion | Download backups to your own storage; adjust `backup.keep` |
 
 Logs: `storage/logs/php-error.log`, `app.log`, `mail.log`, `exceptions.log`,
 `security.log`, `uploads.log`, `contact.log`.
@@ -252,4 +294,4 @@ Logs: `storage/logs/php-error.log`, `app.log`, `mail.log`, `exceptions.log`,
 4. If the schema changes in a future version, the installer/migration path will be documented
    in the release notes; do not delete the database.
 5. Re-run `php tools/site-check.php https://tijanidev.com.ng` after a major change and click
-   through: home → projects → a project → contact → admin login.
+   through: home → projects → a project → contact → admin login → download a backup.

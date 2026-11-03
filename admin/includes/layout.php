@@ -98,7 +98,7 @@ function admin_header(array $page): void
                 <span class="brand__mark" aria-hidden="true">TA</span>
                 <span class="admin-brand__text">
                     <strong>Dashboard</strong>
-                    <small>Tijani.dev</small>
+                    <small>TijaniDev</small>
                 </span>
             </a>
 

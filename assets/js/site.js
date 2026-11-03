@@ -1,5 +1,5 @@
 /* =========================================================================
-   Tijani.dev — public site behaviour
+   TijaniDev — public site behaviour
    -------------------------------------------------------------------------
    Small, dependency-free progressive enhancements. Everything on the page
    works without this file; it only adds polish.

@@ -758,7 +758,127 @@ $messageDelete = $admin->post('/admin/message.php', [
 check('message deleted', $messageDelete['status'] === 302 && db_value('SELECT id FROM contact_messages WHERE id = :id', [':id' => (int) $storedMessage['id']]) === null);
 
 /* -------------------------------------------------------------------------
- * 7. Login throttling + logout
+ * 7. Backup download + restore from upload
+ * ---------------------------------------------------------------------- */
+
+group('backup and restore');
+
+$restorePage = $admin->get('/admin/restore.php');
+check('restore page renders', $restorePage['status'] === 200 && str_contains($restorePage['body'], 'Restore from a database backup'));
+structure('restore page', $restorePage['body']);
+$restoreCsrf = csrf_from($restorePage['body']);
+
+$backup = $admin->get('/admin/backup.php');
+check('live database backup downloads', $backup['status'] === 200 && str_starts_with($backup['body'], "SQLite format 3\x00"));
+check('backup downloads as an attachment', str_contains(strtolower($backup['headers']['content-type'] ?? ''), 'sqlite') && str_contains(strtolower($backup['headers']['content-disposition'] ?? ''), 'attachment'));
+
+$backupFile = sys_get_temp_dir() . '/tj-backup-' . $suffix . '.sqlite';
+file_put_contents($backupFile, $backup['body']);
+check('backup file saved for upload', is_file($backupFile) && filesize($backupFile) > 0);
+
+// Change the database after the backup, so a restore is observable.
+$markerForm = $admin->get('/admin/project-form.php');
+$markerSlug = 'test-restore-marker-' . $suffix;
+$marker = $admin->post('/admin/project-form.php', [
+    'csrf_token'        => csrf_from($markerForm['body']),
+    'id'                => '0',
+    'title'             => 'Restore marker ' . $suffix,
+    'slug'              => $markerSlug,
+    'short_description' => '',
+    'description'       => '',
+    'problem'           => '',
+    'solution'          => '',
+    'category_id'       => '0',
+    'status'            => 'draft',
+    'seo_title'         => '',
+    'seo_description'   => '',
+    'live_url'          => '',
+    'github_url'        => '',
+    'completion_date'   => '',
+]);
+check('marker project created after the backup', $marker['status'] === 302 && project_by_slug($markerSlug, false) !== null);
+
+$noCsrfRestore = $admin->post('/admin/restore.php', ['confirm_restore' => '1']);
+check('restore without CSRF → 419', $noCsrfRestore['status'] === 419);
+
+$noConfirm = $admin->post('/admin/restore.php', [
+    'csrf_token' => $restoreCsrf,
+    'backup_file' => new CURLFile($backupFile, 'application/octet-stream', 'portfolio.sqlite'),
+]);
+$noConfirmFollow = $admin->follow($noConfirm);
+check('restore requires explicit confirmation', str_contains($noConfirmFollow['body'], 'Tick the confirmation box'));
+check('unconfirmed restore left the database alone', project_by_slug($markerSlug, false) !== null);
+
+$invalidFile = sys_get_temp_dir() . '/tj-invalid-' . $suffix . '.sqlite';
+file_put_contents($invalidFile, 'this is definitely not a database');
+$restorePage = $admin->get('/admin/restore.php');
+$badUpload = $admin->post('/admin/restore.php', [
+    'csrf_token'      => csrf_from($restorePage['body']),
+    'confirm_restore' => '1',
+    'backup_file'     => new CURLFile($invalidFile, 'application/octet-stream', 'broken.sqlite'),
+]);
+$badFollow = $admin->follow($badUpload);
+check('non-database upload is rejected', str_contains($badFollow['body'], 'not a SQLite database'));
+check('rejected upload left the database alone', project_by_slug($markerSlug, false) !== null);
+
+$wrongSchemaFile = sys_get_temp_dir() . '/tj-wrong-schema-' . $suffix . '.sqlite';
+$wrongPdo = new PDO('sqlite:' . $wrongSchemaFile);
+$wrongPdo->exec('CREATE TABLE unrelated (id INTEGER PRIMARY KEY)');
+$wrongPdo = null;
+$restorePage = $admin->get('/admin/restore.php');
+$wrongUpload = $admin->post('/admin/restore.php', [
+    'csrf_token'      => csrf_from($restorePage['body']),
+    'confirm_restore' => '1',
+    'backup_file'     => new CURLFile($wrongSchemaFile, 'application/octet-stream', 'wrong.sqlite'),
+]);
+$wrongFollow = $admin->follow($wrongUpload);
+check('database from another application is rejected', str_contains($wrongFollow['body'], 'missing tables'));
+check('wrong-schema upload left the database alone', project_by_slug($markerSlug, false) !== null);
+
+// Windows will not rename a database while this test process holds a handle.
+Database::resetConnection();
+gc_collect_cycles();
+
+$restorePage = $admin->get('/admin/restore.php');
+$validRestore = $admin->post('/admin/restore.php', [
+    'csrf_token'      => csrf_from($restorePage['body']),
+    'confirm_restore' => '1',
+    'backup_file'     => new CURLFile($backupFile, 'application/vnd.sqlite3', 'portfolio.sqlite'),
+]);
+check('valid backup restores', $validRestore['status'] === 302 && str_contains($validRestore['location'], 'system.php'), $validRestore['location']);
+
+// The test process still holds a connection to the replaced file.
+Database::resetConnection();
+gc_collect_cycles();
+
+$afterRestore = $admin->get('/admin/index.php');
+check('admin session survives a same-site restore', $afterRestore['status'] === 200);
+check('database returned to the backup state', project_by_slug($markerSlug, false) === null);
+check('restored project count is correct', (int) db_value('SELECT COUNT(*) FROM projects') === 3);
+check('restore is recorded in the activity log', (int) db_value("SELECT COUNT(*) FROM activity_log WHERE action = 'system.restored'") >= 1);
+
+$safetyCopies = list_database_backups(5);
+check('pre-restore safety copy was created', $safetyCopies !== []);
+$safetyName = (string) ($safetyCopies[0]['name'] ?? '');
+$safetyPath = backup_directory() . '/' . $safetyName;
+check('safety copy is a valid SQLite file', $safetyName !== '' && is_sqlite_file($safetyPath));
+
+$safetyDownload = $admin->get('/admin/backup.php?file=' . rawurlencode($safetyName));
+check('safety copy can be downloaded', $safetyDownload['status'] === 200 && str_starts_with($safetyDownload['body'], "SQLite format 3\x00"));
+$traversal = $admin->get('/admin/backup.php?file=' . rawurlencode('../portfolio.sqlite'));
+check('backup download refuses path traversal', in_array($traversal['status'], [400, 403, 404], true), 'status ' . $traversal['status']);
+
+$anonymousBackup = $anonymous->get('/admin/backup.php');
+check('backup download requires authentication', $anonymousBackup['status'] === 302 && str_contains($anonymousBackup['location'], 'login.php'));
+$anonymousRestore = $anonymous->get('/admin/restore.php');
+check('restore page requires authentication', $anonymousRestore['status'] === 302 && str_contains($anonymousRestore['location'], 'login.php'));
+
+@unlink($backupFile);
+@unlink($invalidFile);
+@unlink($wrongSchemaFile);
+
+/* -------------------------------------------------------------------------
+ * 8. Login throttling + logout
  * ---------------------------------------------------------------------- */
 
 group('login throttling');
@@ -786,7 +906,7 @@ $afterLogout = $admin->get('/admin/index.php');
 check('dashboard locked after logout', $afterLogout['status'] === 302 && str_contains($afterLogout['location'], 'login.php'));
 
 /* -------------------------------------------------------------------------
- * 8. Database integrity
+ * 9. Database integrity
  * ---------------------------------------------------------------------- */
 
 group('database');

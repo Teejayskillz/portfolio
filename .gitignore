@@ -12,6 +12,8 @@
 !/storage/sessions/.gitkeep
 /storage/backups/*
 !/storage/backups/.gitkeep
+/storage/restore/*
+!/storage/restore/.gitkeep
 
 # Uploaded project media (kept on the server, not in Git)
 /assets/uploads/projects/*

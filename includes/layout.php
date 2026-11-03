@@ -125,7 +125,7 @@ function site_header(array $page = []): void
         <a class="brand" href="<?= e(home_url()) ?>" aria-label="<?= e($owner['name']) ?> — home">
             <span class="brand__mark" aria-hidden="true">TA</span>
             <span class="brand__text">
-                <strong>Tijani<span class="brand__accent">.</span>dev</strong>
+                <strong>Tijani<span class="brand__accent">Dev</span></strong>
                 <small>Software &amp; Web Developer</small>
             </span>
         </a>
@@ -174,7 +174,7 @@ function site_footer(array $page = []): void
                 <a class="brand brand--footer" href="<?= e(home_url()) ?>" aria-label="<?= e($owner['name']) ?> — home">
                     <span class="brand__mark" aria-hidden="true">TA</span>
                     <span class="brand__text">
-                        <strong>Tijani<span class="brand__accent">.</span>dev</strong>
+                        <strong>Tijani<span class="brand__accent">Dev</span></strong>
                         <small>Software &amp; Web Developer</small>
                     </span>
                 </a>

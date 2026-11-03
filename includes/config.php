@@ -90,4 +90,11 @@ return [
         'featured_limit'    => 3,
         'home_recent_limit' => 6,
     ],
+
+    'backup' => [
+        // Largest database file accepted by the restore tool.
+        'max_restore_bytes' => 100 * 1024 * 1024,
+        // Automatic safety copies kept in storage/backups.
+        'keep' => 10,
+    ],
 ];

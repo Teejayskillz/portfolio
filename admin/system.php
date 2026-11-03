@@ -27,12 +27,15 @@ $guards = [
 
 $adminCount = (int) db_value('SELECT COUNT(*) FROM admin_users');
 $stats = dashboard_stats();
+$safetyCopies = list_database_backups(5);
 
 $page = [
     'title'    => 'System & backup',
     'subtitle' => 'Server checks and data safety',
     'active'   => 'system',
-    'actions'  => '<a class="btn btn--primary btn--sm" href="' . e(admin_url('backup.php')) . '">'
+    'actions'  => '<a class="btn btn--ghost btn--sm" href="' . e(admin_url('restore.php')) . '">'
+        . icon('upload', 'icon', 14) . ' Restore backup</a>'
+        . '<a class="btn btn--primary btn--sm" href="' . e(admin_url('backup.php')) . '">'
         . icon('download', 'icon', 14) . ' Download database backup</a>',
 ];
 
@@ -45,6 +48,9 @@ admin_header($page);
         <p class="page-head__sub">Everything the portfolio needs, and how to keep it healthy.</p>
     </div>
     <div class="page-head__actions">
+        <a class="btn btn--ghost btn--sm" href="<?= e(admin_url('restore.php')) ?>">
+            <?= icon('upload', 'icon', 14) ?> Restore from backup
+        </a>
         <a class="btn btn--ghost btn--sm" href="<?= e(admin_url('backup.php')) ?>">
             <?= icon('download', 'icon', 14) ?> Backup the database
         </a>
@@ -144,6 +150,18 @@ admin_header($page);
                     </dd>
                 </div>
                 <div class="system-row">
+                    <dt>Backups writable</dt>
+                    <dd class="<?= (is_dir(backup_directory()) ? is_writable(backup_directory()) : is_writable(APP_STORAGE)) ? 'is-ok' : 'is-fail' ?>">
+                        <?= (is_dir(backup_directory()) ? is_writable(backup_directory()) : is_writable(APP_STORAGE)) ? 'yes' : 'no' ?>
+                    </dd>
+                </div>
+                <div class="system-row">
+                    <dt>Restore staging writable</dt>
+                    <dd class="<?= (is_dir(restore_directory()) ? is_writable(restore_directory()) : is_writable(APP_STORAGE)) ? 'is-ok' : 'is-fail' ?>">
+                        <?= (is_dir(restore_directory()) ? is_writable(restore_directory()) : is_writable(APP_STORAGE)) ? 'yes' : 'no' ?>
+                    </dd>
+                </div>
+                <div class="system-row">
                     <dt>Installed at</dt>
                     <dd><?= e(format_datetime($installedAt) ?: 'unknown') ?></dd>
                 </div>
@@ -216,20 +234,42 @@ admin_header($page);
 
     <section class="panel">
         <header class="panel__head">
-            <h2 class="panel__title">Backup</h2>
+            <h2 class="panel__title">Backup &amp; restore</h2>
+            <a class="link-arrow" href="<?= e(admin_url('restore.php')) ?>">Restore <?= icon('arrow-right', 'icon', 14) ?></a>
         </header>
         <div class="panel__body">
             <p class="field__hint">
-                Download the SQLite database to keep an offline copy. To restore, stop using the site and
-                replace <code>storage/portfolio.sqlite</code> (delete the <code>-wal</code> and
-                <code>-shm</code> files first).
+                Download the SQLite database to keep an offline copy, or upload a backup on the
+                restore page. Every restore writes a safety copy of the current database first, so a
+                mistake can be undone.
             </p>
-            <a class="btn btn--primary btn--sm" href="<?= e(admin_url('backup.php')) ?>" style="margin-top: .8rem">
-                <?= icon('download', 'icon', 14) ?> Download backup now
-            </a>
+            <div class="page-head__actions" style="margin-top: .8rem">
+                <a class="btn btn--primary btn--sm" href="<?= e(admin_url('backup.php')) ?>">
+                    <?= icon('download', 'icon', 14) ?> Download backup now
+                </a>
+                <a class="btn btn--ghost btn--sm" href="<?= e(admin_url('restore.php')) ?>">
+                    <?= icon('upload', 'icon', 14) ?> Restore from upload
+                </a>
+            </div>
+
+            <?php if ($safetyCopies !== []): ?>
+                <p class="panel__hint" style="margin-top: 1.1rem; margin-bottom: .4rem">Recent safety copies</p>
+                <div class="system-list">
+                    <?php foreach ($safetyCopies as $copy): ?>
+                        <div class="system-row">
+                            <dt><?= e($copy['name']) ?></dt>
+                            <dd>
+                                <?= e(format_bytes($copy['size'])) ?> ·
+                                <a href="<?= e(admin_url('backup.php?file=' . rawurlencode($copy['name']))) ?>">download</a>
+                            </dd>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+
             <p class="field__hint" style="margin-top: .8rem">
                 Screenshots live in <code>assets/uploads/</code> — include that folder in your cPanel
-                account backups as well.
+                account backups as well. The database backup does not contain the images.
             </p>
         </div>
     </section>

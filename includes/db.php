@@ -11,9 +11,14 @@ declare(strict_types=1);
 
 final class Database
 {
-    private const SCHEMA_VERSION = 1;
+    public const SCHEMA_VERSION = 1;
 
     private static ?PDO $pdo = null;
+
+    public static function schemaVersion(): int
+    {
+        return self::SCHEMA_VERSION;
+    }
 
     public static function connection(): PDO
     {

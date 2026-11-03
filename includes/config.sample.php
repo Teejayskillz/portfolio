@@ -50,4 +50,11 @@ return [
         'contact_window'     => 3600,
         'password_min'       => 10,
     ],
+
+    'backup' => [
+        // Largest .sqlite file accepted by Admin → Restore.
+        'max_restore_bytes' => 100 * 1024 * 1024,
+        // Automatic pre-restore safety copies kept in storage/backups.
+        'keep' => 10,
+    ],
 ];

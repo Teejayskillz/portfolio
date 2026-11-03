@@ -149,6 +149,7 @@ require_once __DIR__ . '/uploads.php';
 require_once __DIR__ . '/mailer.php';
 require_once __DIR__ . '/contact.php';
 require_once __DIR__ . '/repositories.php';
+require_once __DIR__ . '/backup.php';
 require_once __DIR__ . '/seo.php';
 require_once __DIR__ . '/seed.php';
 require_once __DIR__ . '/layout.php';

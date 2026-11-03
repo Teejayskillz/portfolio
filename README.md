@@ -1,4 +1,4 @@
-# Tijani.dev — personal developer portfolio
+# TijaniDev — personal developer portfolio
 
 A PHP portfolio for **Apatira Tijani Adewale**, Software & Web Developer (Lagos, Nigeria),
 upgraded from the original single-page template into a database-driven site with a private
@@ -13,7 +13,7 @@ project dashboard.
 | Area | Detail |
 |---|---|
 | Public site | Home, projects index, project detail pages, contact, thank-you, 404, XML sitemap, robots.txt |
-| Admin | Dashboard, projects CRUD, publishing, featured flags, cover + multi-screenshot uploads, categories, technologies, contact messages, system checks, database backup |
+| Admin | Dashboard, projects CRUD, publishing, featured flags, cover + multi-screenshot uploads, categories, technologies, contact messages, system checks, database download **and restore from an uploaded backup** |
 | Database | SQLite (PDO, prepared statements, foreign keys, indexes) |
 | Content | Projects, categories, technologies and screenshots are edited in the dashboard — no PHP edits needed |
 | Email | Surface-level `mail()` with explicit failure handling and a stored-message fallback |
@@ -70,7 +70,8 @@ admin/
   message.php             message detail / delete
   change-password.php     forced + voluntary password change
   system.php              environment, data and security checks
-  backup.php              authenticated SQLite download
+  backup.php              authenticated SQLite download (live DB or safety copy)
+  restore.php             upload + validate + restore a database backup
   includes/               admin layout + guards (denied to the web)
 
 includes/
@@ -78,6 +79,7 @@ includes/
   config.sample.php       copy to config.local.php for per-server settings
   bootstrap.php           error handling, sessions, headers, module loading
   db.php, schema.php      PDO connection + idempotent schema
+  backup.php              backup, inspection, restore swap + rollback
   seed.php                starter categories, technologies, real GitHub projects
   auth.php                login, throttling, sessions, password change
   csrf.php                per-session CSRF token
@@ -135,7 +137,7 @@ php -S 127.0.0.1:8081 tools/dev-router.php
 # terminal 2
 PORTFOLIO_STORAGE="$PWD/tools/tmp/test-storage" PORTFOLIO_MAIL_TRANSPORT=capture \
 php tools/install-cli.php
-php tools/http-tests.php http://127.0.0.1:8081     # 144 functional/security assertions
+php tools/http-tests.php http://127.0.0.1:8081     # 171 functional/security assertions
 php tools/site-check.php http://127.0.0.1:8080      # markup, SEO, links, CSS
 ```
 
@@ -143,7 +145,9 @@ php tools/site-check.php http://127.0.0.1:8080      # markup, SEO, links, CSS
 publish → feature → unpublish → edit → delete), authentication, forced password change,
 login throttling, CSRF on every state-changing route, contact validation, honeypot/timing
 spam traps, rate limiting, upload rejection of executable files, XSS escaping and cascade
-deletion. The fixtures live in `tools/fixtures/`.
+deletion. It also downloads a live database backup, uploads it back through the restore
+tool, checks the automatic safety copy, path-traversal protection and rollback of rejected
+files. The fixtures live in `tools/fixtures/`.
 
 > `PORTFOLIO_MAIL_TRANSPORT=capture` simulates delivery into `storage/logs/captured/`.
 > Production always uses `native`; the dashboard warns loudly if anything else is set.
@@ -170,6 +174,10 @@ stack — never publish claims that are not true.
 * Server-side validation for every input; output escaped with `htmlspecialchars`.
 * Uploads verified by `finfo` MIME + `getimagesize`, extension derived from MIME, random
   filenames, 5 MB limit, 32×32 px minimum, executable uploads rejected.
+* Database restore is admin-only, CSRF-protected, magic-byte checked, integrity-checked,
+  schema-version checked, trigger-rejecting, preceded by an automatic safety copy and rolled
+  back automatically if verification fails. Backup downloads are restricted to the backups
+  directory and refuse path traversal.
 * Private directories (`includes/`, `storage/`, `templates/`, `tools/`, `admin/includes/`)
   denied by `.htaccess`, by the PHP guards and by the dev router.
 * Security headers sent from PHP and Apache; admin responses marked `noindex`.
@@ -187,6 +195,8 @@ stack — never publish claims that are not true.
   site on a phone before launch if you want visual confirmation.
 * The live domain currently serves an unrelated Botble "James.dev" demo theme, not this
   repository. Deploying this project to `public_html` replaces it; see `DEPLOYMENT.md`.
+* Database backups contain projects, text, taxonomies and messages — **not** the image files
+  in `assets/uploads/`. Back those up separately.
 
 ---
 
