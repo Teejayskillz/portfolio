@@ -87,16 +87,19 @@ return [
     ],
 
     'mail' => [
+        // Fallback defaults only — after first sign-in use Admin → Email settings.
         'transport' => 'native',
         'to'        => 'tijaniapatira@gmail.com',
         'from'      => 'no-reply@tijanidev.com.ng',
-        'from_name' => 'Tijani Dev Website',
+        'from_name' => 'TijaniDev',
     ],
 ];
 ```
 
 Notes:
 
+* **Email addresses and the visitor confirmation are managed in Admin → Email settings**, not
+  in this file. The `mail.*` values here are fallbacks used before the first save.
 * If you move storage above `public_html`, create the folder first
   (`/home/YOUR_CPANEL_USER/portfolio-storage`). Keeping it inside `public_html/storage` also
   works — that folder is denied by `.htaccess` and by a PHP guard — but outside is safer.
@@ -137,23 +140,50 @@ Session rules: 30 minutes idle timeout, 12 hours absolute, login throttled to 5 
 
 ---
 
-## 7. Contact-form email delivery
+## 7. Email notifications and confirmations
 
-The form uses PHP `mail()` through the host's MTA.
+Everything the owner normally changes is in the dashboard: **Admin → Email settings**
+(`/admin/email.php`). No code editing or redeploy is needed after a change.
 
-1. In cPanel → **Email Accounts**, create `no-reply@tijanidev.com.ng` (or a forwarder).
-2. In `includes/config.local.php`, set `mail.from` to that address and `mail.to` to your
-   inbox.
-3. Make sure the domain has **SPF** (and ideally **DKIM**) records in cPanel → **Email
-   Deliverability**. Without them Gmail may file the notification as spam.
-4. Send a test message from the public contact form.
-5. Check **Admin → Messages**:
-   * `Delivered` = the host accepted the message;
-   * `Mail failed` = it was **not** emailed. The message is still stored so you can reply
-     manually. The form told the visitor the truth and pointed them at WhatsApp/email.
+1. **Notification email** — the inbox that should receive each contact submission.
+2. **Sender name** and **sender email** — what recipients see. Use an address on your own
+   domain (for example `no-reply@tijanidev.com.ng`), not a Gmail address, for deliverability.
+3. **Visitor confirmation** — optional automatic receipt sent to the person who submitted the
+   form. Edit the subject and message; placeholders such as `{name}`, `{subject}`, `{message}`,
+   `{owner_name}`, `{site_name}` and `{site_url}` are replaced on send.
+4. Click **Send test email** to check delivery to the notification address, then submit the
+   public form once and confirm both copies arrive (your inbox and the visitor's).
+5. Settings are stored in SQLite, so they are included in database backups and survive a
+   restore.
 
-The default transport is `native`. The dashboard shows a warning whenever it is not `native`
-(`log` and `capture` are development aids and never deliver mail).
+Order of sending on every contact submission:
+
+1. the owner notification is sent first;
+2. only if the mail server accepts it, the visitor confirmation is sent;
+3. either way the message is stored under **Messages** (with `Delivered` or `Mail failed`);
+4. if the owner notification fails the visitor sees an honest error and the WhatsApp/email
+   fallback — a confirmation is **never** sent claiming success;
+5. if only the confirmation fails, the enquiry is still delivered and the visitor is told the
+   confirmation could not be sent.
+
+### Host requirements
+
+The send method is PHP `mail()` through the host MTA (shown on the settings page and in
+System). For it to work reliably:
+
+* create the **From** mailbox/forwarder in cPanel → **Email Accounts**;
+* enable **SPF** and **DKIM** in cPanel → **Email Deliverability** (without them Gmail may
+  spam-folder notifications);
+* make sure your host allows `mail()` (most cPanel accounts do).
+
+`includes/config.local.php` still holds fallback values
+(`mail.to`, `mail.from`, `mail.from_name`) used before the first dashboard save. Once you save
+from **Email settings** the database wins. **Reset to defaults** on that page removes the
+database overrides.
+
+The transport itself (`native`, or the development-only `log`/`capture`) is configured in
+`includes/config.local.php`; `native` is required for real delivery and the dashboard warns
+when it is anything else.
 
 ---
 
@@ -183,7 +213,9 @@ In a **sub-directory** deployment, change `ErrorDocument 404 /404.php` in `.htac
 3. Set **Published** and, for the best three, **Featured**.
 4. **Categories** and **Technologies** are editable at any time; deleting a technology detaches
    it from projects, deleting a category in use is refused until its projects are moved.
-5. **Messages** shows every contact submission, including failed deliveries.
+5. **Email settings** — set your notification address, sender identity and the visitor
+   confirmation, then send a test email.
+6. **Messages** shows every contact submission, including failed deliveries.
 
 Nothing on the public site is hardcoded: the home page, project index, detail pages and
 sitemap all read the database.
@@ -268,7 +300,11 @@ Editor** (or restore manually, below).
 | Installer says `pdo_sqlite missing` | Extension disabled | Enable it in **Select PHP Version → Extensions** |
 | “Storage directory not writable” | Wrong owner/permissions | `chmod 0750 storage` and ensure the account owns it; create the folder configured in `config.local.php` |
 | Uploads fail | `fileinfo` disabled, folder not writable, PHP upload limit | Enable `fileinfo`; `chmod 0755 assets/uploads`; raise `upload_max_filesize`/`post_max_size` to ≥ 8M |
-| Contact form: “saved but not delivered” | Host refuses `mail()`, missing From mailbox, SPF/DKIM | Create the mailbox, set `mail.from`, check **Messages**, test again |
+| Contact form: “saved but not delivered” | Host refuses `mail()`, missing From mailbox, SPF/DKIM | Set the addresses in **Admin → Email settings**, create the From mailbox, run **Send test email**, check **Messages** |
+| Email settings won’t save | `storage` not writable or database read-only | Check **System** for writable storage; read `storage/logs/php-error.log` |
+| Test email fails | `mail()` disabled or From address rejected | Confirm the From mailbox exists, ask the host to enable `mail()`, check SPF/DKIM |
+| Visitor did not receive confirmation | Toggle off, mail server rejected it, or it landed in spam | Check **Email settings** and the warning on the thank-you page; inspect `storage/logs/mail.log` / ask them to check spam |
+| Confirmation copy not updating | Old offer/backup restored the database settings | Re-save **Email settings**; settings travel with the database backup |
 | `/projects` → 404 | `mod_rewrite` off | Enable rewrite or set `clean_urls` false |
 | Admin redirects to login repeatedly | Cookies blocked / HTTPS mismatch / session path | Serve only one hostname (`www` vs non-`www`), allow cookies, ensure `storage/sessions` writable |
 | “Too many sign-in attempts” | Throttling | Wait 15 minutes; failures are pruned automatically |

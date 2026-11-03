@@ -36,6 +36,10 @@ return [
 
     'timezone' => 'Africa/Lagos',
 
+    // Short brand name used in emails and anywhere the domain-style name would
+    // be awkward (e.g. "Your message to TijaniDev").
+    'brand' => 'TijaniDev',
+
     'owner' => [
         'name'         => 'Apatira Tijani Adewale',
         'first_name'   => 'Tijani',
@@ -66,9 +70,11 @@ return [
         // native = PHP mail() via the host MTA. log = write to storage/logs
         // (local preview only — never claim delivery with the log transport).
         'transport' => getenv('PORTFOLIO_MAIL_TRANSPORT') ?: 'native',
+        // Fallback defaults only. Admin → Email settings overrides these in the
+        // database once saved, so no redeploy is needed to change an address.
         'to'        => 'tijaniapatira@gmail.com',
         'from'      => 'no-reply@tijanidev.com.ng',
-        'from_name' => 'Tijani Dev Website',
+        'from_name' => 'TijaniDev',
         'log_file'  => 'mail.log',
     ],
 

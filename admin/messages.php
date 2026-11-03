@@ -37,7 +37,7 @@ admin_header($page);
         </p>
     </div>
     <div class="page-head__actions">
-        <a class="btn btn--ghost btn--sm" href="<?= e(admin_url('system.php')) ?>"><?= icon('shield', 'icon', 14) ?> Mail settings</a>
+        <a class="btn btn--ghost btn--sm" href="<?= e(admin_url('email.php')) ?>"><?= icon('mail', 'icon', 14) ?> Email settings</a>
     </div>
 </div>
 

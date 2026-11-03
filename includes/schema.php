@@ -15,6 +15,13 @@ return [
         value TEXT NOT NULL DEFAULT ''
     )",
 
+    // Dashboard-managed settings (email configuration, etc.) -------------
+    "CREATE TABLE IF NOT EXISTS app_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL DEFAULT '',
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )",
+
     // Admin accounts ------------------------------------------------------
     "CREATE TABLE IF NOT EXISTS admin_users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

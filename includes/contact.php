@@ -106,11 +106,14 @@ function store_contact_message(array $data, string $status, string $ip, string $
  * Full submission pipeline.
  *
  * @param array<string, mixed> $input raw $_POST
- * @return array{ok:bool, spam:bool, status:string, errors:array<string,string>, message:string}
+ * @return array{ok:bool, spam:bool, status:string, errors:array<string,string>, message:string, warnings:list<string>}
  */
 function contact_submit(array $input, string $ip, string $userAgent): array
 {
-    $result = ['ok' => false, 'spam' => false, 'status' => 'pending', 'errors' => [], 'message' => ''];
+    $result = [
+        'ok' => false, 'spam' => false, 'status' => 'pending',
+        'errors' => [], 'message' => '', 'warnings' => [],
+    ];
 
     $honeypot = trim((string) ($input['website'] ?? ''));
     if ($honeypot !== '') {
@@ -172,15 +175,31 @@ function contact_submit(array $input, string $ip, string $userAgent): array
     }
 
     $data = $validated['data'];
-    $delivery = send_contact_notification($data, $ip, $userAgent);
+    $settings = mail_settings();
+    $delivery = send_contact_notification($data, $ip, $userAgent, $settings);
+
+    $confirmation = null;
+    if ($delivery['ok'] && !empty($settings['confirmation_enabled'])) {
+        $confirmation = send_visitor_confirmation($data, $settings);
+        if (!$confirmation['ok']) {
+            app_log('contact', 'Visitor confirmation could not be sent', [
+                'email' => $data['email'],
+                'error' => $confirmation['error'],
+            ]);
+            $result['warnings'][] = 'Your message was delivered, but the automatic confirmation email '
+                . 'could not be sent to you.';
+        }
+    }
 
     $status = $delivery['ok'] ? 'sent' : 'failed';
     $messageId = store_contact_message($data, $status, $ip, $userAgent);
 
     app_log('contact', 'Contact submission processed', [
-        'id'        => $messageId,
-        'status'    => $status,
-        'mail_error'=> $delivery['error'],
+        'id'               => $messageId,
+        'status'           => $status,
+        'mail_error'       => $delivery['error'],
+        'confirmation'     => is_array($confirmation) ? ($confirmation['ok'] ? 'sent' : 'failed') : 'disabled',
+        'confirmation_err' => is_array($confirmation) ? $confirmation['error'] : '',
     ]);
 
     if (!$delivery['ok']) {
@@ -191,5 +210,12 @@ function contact_submit(array $input, string $ip, string $userAgent): array
         return $result;
     }
 
-    return ['ok' => true, 'spam' => false, 'status' => 'sent', 'errors' => [], 'message' => ''];
+    return [
+        'ok'       => true,
+        'spam'     => false,
+        'status'   => 'sent',
+        'errors'   => [],
+        'message'  => '',
+        'warnings' => $result['warnings'],
+    ];
 }

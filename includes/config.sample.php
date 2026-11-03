@@ -35,9 +35,11 @@ return [
         // Keep "native" in production. "log"/"capture" are development aids and
         // never deliver mail.
         'transport' => 'native',
+        // Fallback defaults. Once you save Admin → Email settings, the database
+        // values take precedence over these.
         'to'        => 'tijaniapatira@gmail.com',
         'from'      => 'no-reply@tijanidev.com.ng',
-        'from_name' => 'Tijani Dev Website',
+        'from_name' => 'TijaniDev',
     ],
 
     'security' => [

@@ -56,6 +56,7 @@ function admin_header(array $page): void
         ],
         'inbox' => [
             ['key' => 'messages', 'label' => 'Messages', 'href' => admin_url('messages.php'), 'icon' => 'message', 'badge' => $counts['messages']],
+            ['key' => 'email', 'label' => 'Email settings', 'href' => admin_url('email.php'), 'icon' => 'mail'],
         ],
         'account' => [
             ['key' => 'system', 'label' => 'System &amp; backup', 'href' => admin_url('system.php'), 'icon' => 'shield'],

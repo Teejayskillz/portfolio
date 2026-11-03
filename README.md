@@ -13,10 +13,10 @@ project dashboard.
 | Area | Detail |
 |---|---|
 | Public site | Home, projects index, project detail pages, contact, thank-you, 404, XML sitemap, robots.txt |
-| Admin | Dashboard, projects CRUD, publishing, featured flags, cover + multi-screenshot uploads, categories, technologies, contact messages, system checks, database download **and restore from an uploaded backup** |
+| Admin | Dashboard, projects CRUD, publishing, featured flags, cover + multi-screenshot uploads, categories, technologies, contact messages, **email settings**, system checks, database download **and restore from an uploaded backup** |
 | Database | SQLite (PDO, prepared statements, foreign keys, indexes) |
 | Content | Projects, categories, technologies and screenshots are edited in the dashboard — no PHP edits needed |
-| Email | Surface-level `mail()` with explicit failure handling and a stored-message fallback |
+| Email | Owner notification + optional visitor confirmation, configured entirely from **Admin → Email settings**; honest failure handling and a stored-message fallback |
 | SEO | Per-page title/description/canonical, Open Graph/Twitter cards, JSON-LD, dynamic sitemap |
 
 ### Design continuity
@@ -68,6 +68,7 @@ admin/
   technologies.php        technology management
   messages.php            contact inbox
   message.php             message detail / delete
+  email.php               email addresses, confirmation copy, test email
   change-password.php     forced + voluntary password change
   system.php              environment, data and security checks
   backup.php              authenticated SQLite download (live DB or safety copy)
@@ -79,6 +80,7 @@ includes/
   config.sample.php       copy to config.local.php for per-server settings
   bootstrap.php           error handling, sessions, headers, module loading
   db.php, schema.php      PDO connection + idempotent schema
+  settings.php            dashboard-managed settings (email configuration)
   backup.php              backup, inspection, restore swap + rollback
   seed.php                starter categories, technologies, real GitHub projects
   auth.php                login, throttling, sessions, password change
@@ -137,7 +139,7 @@ php -S 127.0.0.1:8081 tools/dev-router.php
 # terminal 2
 PORTFOLIO_STORAGE="$PWD/tools/tmp/test-storage" PORTFOLIO_MAIL_TRANSPORT=capture \
 php tools/install-cli.php
-php tools/http-tests.php http://127.0.0.1:8081     # 171 functional/security assertions
+php tools/http-tests.php http://127.0.0.1:8081     # 200 functional/security assertions
 php tools/site-check.php http://127.0.0.1:8080      # markup, SEO, links, CSS
 ```
 
@@ -145,7 +147,9 @@ php tools/site-check.php http://127.0.0.1:8080      # markup, SEO, links, CSS
 publish → feature → unpublish → edit → delete), authentication, forced password change,
 login throttling, CSRF on every state-changing route, contact validation, honeypot/timing
 spam traps, rate limiting, upload rejection of executable files, XSS escaping and cascade
-deletion. It also downloads a live database backup, uploads it back through the restore
+deletion. It also changes the email configuration, sends a test email, verifies that the
+owner notification and visitor confirmation are both addressed correctly, checks the
+confirmation toggle, downloads a live database backup, uploads it back through the restore
 tool, checks the automatic safety copy, path-traversal protection and rollback of rejected
 files. The fixtures live in `tools/fixtures/`.
 
@@ -174,6 +178,9 @@ stack — never publish claims that are not true.
 * Server-side validation for every input; output escaped with `htmlspecialchars`.
 * Uploads verified by `finfo` MIME + `getimagesize`, extension derived from MIME, random
   filenames, 5 MB limit, 32×32 px minimum, executable uploads rejected.
+* Email settings are admin-only, CSRF-protected and validated; the visitor confirmation is
+  only sent after the owner notification is accepted, and delivery failures are reported
+  honestly instead of showing a false success.
 * Database restore is admin-only, CSRF-protected, magic-byte checked, integrity-checked,
   schema-version checked, trigger-rejecting, preceded by an automatic safety copy and rolled
   back automatically if verification fails. Backup downloads are restricted to the backups
@@ -187,9 +194,11 @@ stack — never publish claims that are not true.
 
 ## Known limitations
 
-* Mail uses PHP's `mail()`. Delivery depends on the host's MTA and on SPF/DKIM records for the
-  domain; there is no SMTP client. Failed delivery is reported honestly and the message is
-  stored in the inbox — see `DEPLOYMENT.md` for setup and troubleshooting.
+* Mail uses PHP's `mail()`. Notification and sender addresses and the visitor confirmation are
+  managed in **Admin → Email settings**; delivery still depends on the host's MTA and on
+  SPF/DKIM records for the domain, and there is no SMTP client. Failed delivery is reported
+  honestly and the message is stored in the inbox — see `DEPLOYMENT.md` for setup and
+  troubleshooting.
 * The environment that produced this build has no browser runtime, so responsiveness was
   verified by CSS breakpoint review and structural checks rather than screenshots. Open the
   site on a phone before launch if you want visual confirmation.

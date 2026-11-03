@@ -143,6 +143,7 @@ if (PHP_SAPI !== 'cli') {
 
 require_once __DIR__ . '/csrf.php';
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/settings.php';
 require_once __DIR__ . '/validation.php';
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/uploads.php';

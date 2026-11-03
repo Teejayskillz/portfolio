@@ -325,3 +325,64 @@ function validate_taxonomy(array $input, string $type): array
 
     return ['data' => $data, 'errors' => $errors];
 }
+
+/**
+ * Validate the dashboard email configuration.
+ *
+ * @param array<string, mixed> $input
+ * @return array{data: array<string, mixed>, errors: array<string, string>}
+ */
+function validate_email_settings(array $input): array
+{
+    $to = clean_single_line((string) ($input['to'] ?? ''));
+    $from = clean_single_line((string) ($input['from'] ?? ''));
+    $fromName = clean_single_line((string) ($input['from_name'] ?? ''));
+    $enabled = !empty($input['confirmation_enabled']);
+    $subject = clean_single_line((string) ($input['confirmation_subject'] ?? ''));
+    $body = clean_text((string) ($input['confirmation_body'] ?? ''));
+    $errors = [];
+
+    if ($to === '') {
+        $errors['to'] = 'Enter the email address that should receive notifications.';
+    } elseif (mb_strlen($to) > 190 || filter_var($to, FILTER_VALIDATE_EMAIL) === false) {
+        $errors['to'] = 'Enter a valid email address (for example you@gmail.com).';
+    }
+
+    if ($from === '') {
+        $errors['from'] = 'Enter the address emails should be sent from.';
+    } elseif (mb_strlen($from) > 190 || filter_var($from, FILTER_VALIDATE_EMAIL) === false) {
+        $errors['from'] = 'Enter a valid sender address (for example no-reply@yourdomain.com).';
+    }
+
+    if ($fromName === '') {
+        $errors['from_name'] = 'Enter the sender name shown in inboxes.';
+    } elseif (mb_strlen($fromName) < 2 || mb_strlen($fromName) > 100) {
+        $errors['from_name'] = 'Use between 2 and 100 characters for the sender name.';
+    }
+
+    if ($subject === '') {
+        $errors['confirmation_subject'] = 'Enter a subject for the visitor confirmation.';
+    } elseif (mb_strlen($subject) < 3 || mb_strlen($subject) > 150) {
+        $errors['confirmation_subject'] = 'Keep the confirmation subject between 3 and 150 characters.';
+    }
+
+    if ($body === '') {
+        $errors['confirmation_body'] = 'Enter the confirmation message visitors should receive.';
+    } elseif (mb_strlen($body) < 20) {
+        $errors['confirmation_body'] = 'The confirmation message is too short (at least 20 characters).';
+    } elseif (mb_strlen($body) > 5000) {
+        $errors['confirmation_body'] = 'Keep the confirmation message under 5000 characters.';
+    }
+
+    return [
+        'data' => [
+            'to'                   => $to,
+            'from'                 => $from,
+            'from_name'            => $fromName,
+            'confirmation_enabled' => $enabled ? 1 : 0,
+            'confirmation_subject' => $subject,
+            'confirmation_body'    => $body,
+        ],
+        'errors' => $errors,
+    ];
+}

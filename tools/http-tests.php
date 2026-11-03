@@ -758,7 +758,156 @@ $messageDelete = $admin->post('/admin/message.php', [
 check('message deleted', $messageDelete['status'] === 302 && db_value('SELECT id FROM contact_messages WHERE id = :id', [':id' => (int) $storedMessage['id']]) === null);
 
 /* -------------------------------------------------------------------------
- * 7. Backup download + restore from upload
+ * 7. Email settings + owner/visitor notifications
+ * ---------------------------------------------------------------------- */
+
+group('email settings');
+
+$emailPage = $admin->get('/admin/email.php');
+check('email settings page renders', $emailPage['status'] === 200 && str_contains($emailPage['body'], 'Email configuration'));
+structure('email settings', $emailPage['body']);
+$emailCsrf = csrf_from($emailPage['body']);
+
+// The pre-existing cPanel sending address must remain the shipped default.
+$mailDefaults = mail_settings();
+check('default sender stays no-reply@tijanidev.com.ng', $mailDefaults['from'] === 'no-reply@tijanidev.com.ng', $mailDefaults['from']);
+check('default sender name is set', $mailDefaults['from_name'] !== '');
+check('default notification address is valid', filter_var($mailDefaults['to'], FILTER_VALIDATE_EMAIL) !== false, $mailDefaults['to']);
+
+$ownerEmail = 'owner+' . $suffix . '@example.test';
+$visitorEmail = 'visitor+' . $suffix . '@example.test';
+$confirmationSubject = 'We received your message — ' . $suffix;
+
+$settingsPayload = [
+    'csrf_token'           => $emailCsrf,
+    'action'               => 'save',
+    'to'                   => $ownerEmail,
+    'from'                 => 'no-reply@tijanidev.com.ng',
+    'from_name'            => 'TijaniDev Test',
+    'confirmation_enabled' => '1',
+    'confirmation_subject' => $confirmationSubject,
+    'confirmation_body'    => "Hi {name},\n\nThanks for contacting {site_name}. Your subject was: {subject}.\n\n{owner_name}",
+];
+$saveSettings = $admin->post('/admin/email.php', $settingsPayload);
+check('email settings saved', $saveSettings['status'] === 302 && str_contains($saveSettings['location'], 'email.php'), $saveSettings['location']);
+check('notification recipient stored', setting_get('mail.to') === $ownerEmail);
+check('confirmation toggle stored', setting_get('mail.confirmation_enabled') === '1');
+check('confirmation template stored', str_contains((string) setting_get('mail.confirmation_body'), '{site_name}'));
+
+$emailPage = $admin->get('/admin/email.php');
+$invalidSettings = $admin->post('/admin/email.php', array_merge($settingsPayload, [
+    'csrf_token' => csrf_from($emailPage['body']),
+    'to'         => 'not-an-email',
+]));
+check('invalid recipient rejected', $invalidSettings['status'] === 200 && str_contains($invalidSettings['body'], 'valid email address'));
+check('invalid save did not overwrite settings', setting_get('mail.to') === $ownerEmail);
+
+$noCsrfSettings = $admin->post('/admin/email.php', ['action' => 'save', 'to' => 'x@example.test']);
+check('email settings POST without CSRF → 419', $noCsrfSettings['status'] === 419);
+
+$anonymousEmail = $anonymous->get('/admin/email.php');
+check('email settings page requires authentication', $anonymousEmail['status'] === 302 && str_contains($anonymousEmail['location'], 'login.php'));
+
+$captureDirectory = APP_STORAGE . '/logs/captured';
+$capturedFiles = static function () use ($captureDirectory): array {
+    $files = glob($captureDirectory . '/*.eml') ?: [];
+    usort($files, static function (string $a, string $b): int {
+        $time = (int) @filemtime($b) <=> (int) @filemtime($a);
+
+        return $time !== 0 ? $time : strcmp($b, $a);
+    });
+
+    return $files;
+};
+$captureSnapshot = static function () use ($captureDirectory): array {
+    return array_map('basename', glob($captureDirectory . '/*.eml') ?: []);
+};
+$newCaptureFiles = static function (array $before) use ($captureDirectory, $captureSnapshot): array {
+    $names = array_values(array_diff($captureSnapshot(), $before));
+    $paths = [];
+    foreach ($names as $name) {
+        $paths[] = $captureDirectory . '/' . $name;
+    }
+
+    return $paths;
+};
+
+$beforeTest = $captureSnapshot();
+$emailPage = $admin->get('/admin/email.php');
+$testEmail = $admin->post('/admin/email.php', [
+    'csrf_token' => csrf_from($emailPage['body']),
+    'action'     => 'test',
+]);
+check('test email accepted by transport', $testEmail['status'] === 302);
+$testFiles = $newCaptureFiles($beforeTest);
+check('test email was generated', count($testFiles) === 1);
+$testFileContents = $testFiles !== [] ? (string) @file_get_contents($testFiles[0]) : '';
+check('test email goes to the configured recipient', str_contains($testFileContents, 'To: ' . $ownerEmail));
+check('test email body identifies the site', str_contains($testFileContents, 'test email from your portfolio dashboard'));
+
+// Fresh contact submission with the new settings.
+db_run('DELETE FROM contact_messages WHERE ip_address = :ip', [':ip' => '127.0.0.1']);
+$beforeContact = $captureSnapshot();
+$page = $anonymous->get('/');
+$csrf = csrf_from($page['body']);
+$token = form_token_from($page['body']);
+sleep(3);
+$contact = $anonymous->post('/contact.php', [
+    'csrf_token' => $csrf,
+    'form_token' => $token,
+    'name'       => 'Visitor ' . $suffix,
+    'email'      => $visitorEmail,
+    'subject'    => 'Dual email test ' . $suffix,
+    'message'    => 'Please send both an owner notification and a visitor confirmation for this message.',
+]);
+check('contact submission succeeds with email settings', $contact['status'] === 302 && str_contains($contact['location'], 'thank-you'));
+$contactFiles = $newCaptureFiles($beforeContact);
+check('owner notification and visitor confirmation both sent', count($contactFiles) === 2, 'captured ' . count($contactFiles));
+
+$ownerMail = '';
+$visitorMail = '';
+foreach ($contactFiles as $file) {
+    $content = (string) @file_get_contents($file);
+    if (str_contains($content, 'To: ' . $ownerEmail)) {
+        $ownerMail = $content;
+    }
+    if (str_contains($content, 'To: ' . $visitorEmail)) {
+        $visitorMail = $content;
+    }
+}
+check('owner copy addressed to the notification email', $ownerMail !== '');
+check('visitor copy addressed to the visitor', $visitorMail !== '');
+check('owner copy includes the enquiry', str_contains($ownerMail, 'Dual email test ' . $suffix));
+check('confirmation renders placeholders', str_contains($visitorMail, 'Thanks for contacting TijaniDev') && str_contains($visitorMail, 'Visitor ' . $suffix));
+check('confirmation subject is applied', str_contains($visitorMail, $confirmationSubject));
+
+// Turn the confirmation off and verify only the owner copy goes out.
+$emailPage = $admin->get('/admin/email.php');
+$disabledPayload = $settingsPayload;
+$disabledPayload['csrf_token'] = csrf_from($emailPage['body']);
+unset($disabledPayload['confirmation_enabled']);
+$disableSettings = $admin->post('/admin/email.php', $disabledPayload);
+check('confirmation can be disabled', $disableSettings['status'] === 302 && setting_get('mail.confirmation_enabled') === '0');
+
+db_run('DELETE FROM contact_messages WHERE ip_address = :ip', [':ip' => '127.0.0.1']);
+$beforeSingle = $captureSnapshot();
+$page = $anonymous->get('/');
+$csrf = csrf_from($page['body']);
+$token = form_token_from($page['body']);
+sleep(3);
+$single = $anonymous->post('/contact.php', [
+    'csrf_token' => $csrf,
+    'form_token' => $token,
+    'name'       => 'Single Mail ' . $suffix,
+    'email'      => 'single+' . $suffix . '@example.test',
+    'subject'    => 'Owner only ' . $suffix,
+    'message'    => 'Confirmation is disabled, so only the owner should receive this message.',
+]);
+$singleFiles = $newCaptureFiles($beforeSingle);
+check('disabled confirmation sends only the owner copy', $single['status'] === 302 && count($singleFiles) === 1, 'captured ' . count($singleFiles));
+
+/* -------------------------------------------------------------------------
+ * 8. Backup download + restore from upload
  * ---------------------------------------------------------------------- */
 
 group('backup and restore');
@@ -878,7 +1027,7 @@ check('restore page requires authentication', $anonymousRestore['status'] === 30
 @unlink($wrongSchemaFile);
 
 /* -------------------------------------------------------------------------
- * 8. Login throttling + logout
+ * 9. Login throttling + logout
  * ---------------------------------------------------------------------- */
 
 group('login throttling');
@@ -906,7 +1055,7 @@ $afterLogout = $admin->get('/admin/index.php');
 check('dashboard locked after logout', $afterLogout['status'] === 302 && str_contains($afterLogout['location'], 'login.php'));
 
 /* -------------------------------------------------------------------------
- * 9. Database integrity
+ * 10. Database integrity
  * ---------------------------------------------------------------------- */
 
 group('database');

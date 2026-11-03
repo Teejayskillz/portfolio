@@ -40,4 +40,9 @@ if (!$result['ok']) {
 }
 
 flash('success', 'Thanks — your message was delivered. I will reply by email.');
+
+foreach ($result['warnings'] ?? [] as $warning) {
+    flash('warning', (string) $warning);
+}
+
 redirect(public_url('thank-you.php'));

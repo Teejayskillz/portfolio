@@ -168,6 +168,7 @@ admin_header($page);
                 <a href="<?= e(admin_url('categories.php')) ?>"><?= icon('tag', 'icon', 16) ?> Manage categories</a>
                 <a href="<?= e(admin_url('technologies.php')) ?>"><?= icon('layers', 'icon', 16) ?> Manage technologies</a>
                 <a href="<?= e(admin_url('messages.php')) ?>"><?= icon('message', 'icon', 16) ?> Read contact messages</a>
+                <a href="<?= e(admin_url('email.php')) ?>"><?= icon('mail', 'icon', 16) ?> Email notifications &amp; confirmation</a>
                 <a href="<?= e(admin_url('system.php')) ?>"><?= icon('shield', 'icon', 16) ?> System check &amp; backup</a>
                 <a href="<?= e(admin_url('restore.php')) ?>"><?= icon('upload', 'icon', 16) ?> Restore a database backup</a>
             </div>

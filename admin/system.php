@@ -15,6 +15,7 @@ $dbWal = is_file($dbPath . '-wal') ? (int) filesize($dbPath . '-wal') : 0;
 $diskFree = @disk_free_space(APP_STORAGE);
 $installedAt = Database::meta('installed_at');
 $transport = mail_transport();
+$mailSettings = mail_settings();
 $installerExists = is_file(APP_ROOT . '/install.php');
 
 $guards = [
@@ -213,21 +214,24 @@ admin_header($page);
     <section class="panel">
         <header class="panel__head">
             <h2 class="panel__title">Mail</h2>
+            <a class="link-arrow" href="<?= e(admin_url('email.php')) ?>">Edit settings <?= icon('arrow-right', 'icon', 14) ?></a>
         </header>
         <div class="panel__body">
             <dl class="system-list">
                 <div class="system-row">
                     <dt>Transport</dt>
-                    <dd class="<?= $transport === 'native' ? 'is-ok' : 'is-fail' ?>"><?= e($transport) ?></dd>
+                    <dd class="<?= $transport === 'native' ? 'is-ok' : 'is-fail' ?>"><?= e($transport === 'native' ? 'PHP mail()' : $transport) ?></dd>
                 </div>
-                <div class="system-row"><dt>Sends to</dt><dd><?= e((string) config('mail.to')) ?></dd></div>
-                <div class="system-row"><dt>From address</dt><dd><?= e((string) config('mail.from')) ?></dd></div>
-                <div class="system-row"><dt>Reply-To</dt><dd>the visitor's address</dd></div>
+                <div class="system-row"><dt>Notifications go to</dt><dd><?= e($mailSettings['to']) ?></dd></div>
+                <div class="system-row"><dt>From</dt><dd><?= e($mailSettings['from_name']) ?> &lt;<?= e($mailSettings['from']) ?>&gt;</dd></div>
+                <div class="system-row"><dt>Visitor confirmation</dt><dd class="<?= $mailSettings['confirmation_enabled'] ? 'is-ok' : '' ?>"><?= $mailSettings['confirmation_enabled'] ? 'enabled' : 'disabled' ?></dd></div>
+                <div class="system-row"><dt>Notification Reply-To</dt><dd>the visitor's address</dd></div>
             </dl>
             <p class="field__hint" style="margin-top: .8rem">
-                If your host does not allow <code>mail()</code>, create the From address as a mailbox in
-                cPanel and point <code>mail.from</code> at it. Messages are still stored in the dashboard
-                if delivery fails.
+                Addresses and confirmation copy are managed in
+                <a href="<?= e(admin_url('email.php')) ?>">Email settings</a>. The transport itself is
+                still chosen in <code>includes/config.local.php</code>. Messages are stored in the
+                dashboard if delivery fails.
             </p>
         </div>
     </section>
