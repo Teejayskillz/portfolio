@@ -12,8 +12,8 @@ project dashboard.
 
 | Area | Detail |
 |---|---|
-| Public site | Home, projects index, project detail pages, contact, thank-you, 404, XML sitemap, robots.txt |
-| Admin | Dashboard, projects CRUD, publishing, featured flags, cover + multi-screenshot uploads, categories, technologies, contact messages, **email settings**, system checks, database download **and restore from an uploaded backup** |
+| Public site | Home, projects index, project detail pages, contact (with an optional WhatsApp field), thank-you, 404, XML sitemap, robots.txt |
+| Admin | Dashboard, projects CRUD, publishing, featured flags, cover + multi-screenshot uploads, categories, technologies, contact messages (with one-click WhatsApp reply), **email settings**, system checks, database download **and restore from an uploaded backup** |
 | Database | SQLite (PDO, prepared statements, foreign keys, indexes) |
 | Content | Projects, categories, technologies and screenshots are edited in the dashboard — no PHP edits needed |
 | Email | Owner notification + optional visitor confirmation, configured entirely from **Admin → Email settings**; honest failure handling and a stored-message fallback |
@@ -139,19 +139,20 @@ php -S 127.0.0.1:8081 tools/dev-router.php
 # terminal 2
 PORTFOLIO_STORAGE="$PWD/tools/tmp/test-storage" PORTFOLIO_MAIL_TRANSPORT=capture \
 php tools/install-cli.php
-php tools/http-tests.php http://127.0.0.1:8081     # 200 functional/security assertions
+php tools/http-tests.php http://127.0.0.1:8081     # 207 functional/security assertions
 php tools/site-check.php http://127.0.0.1:8080      # markup, SEO, links, CSS
 ```
 
 `http-tests.php` covers every public page, the full project lifecycle (create → upload →
 publish → feature → unpublish → edit → delete), authentication, forced password change,
-login throttling, CSRF on every state-changing route, contact validation, honeypot/timing
-spam traps, rate limiting, upload rejection of executable files, XSS escaping and cascade
-deletion. It also changes the email configuration, sends a test email, verifies that the
-owner notification and visitor confirmation are both addressed correctly, checks the
-confirmation toggle, downloads a live database backup, uploads it back through the restore
-tool, checks the automatic safety copy, path-traversal protection and rollback of rejected
-files. The fixtures live in `tools/fixtures/`.
+login throttling, CSRF on every state-changing route, contact validation, the optional
+WhatsApp number and its chat link, honeypot/timing spam traps, rate limiting, upload rejection
+of executable files, XSS escaping and cascade deletion. It also changes the email
+configuration, sends a test email, verifies that the owner notification and visitor
+confirmation are both addressed correctly, checks the confirmation toggle, downloads a live
+database backup, uploads it back through the restore tool, checks the automatic safety copy,
+path-traversal protection and rollback of rejected files. The fixtures live in
+`tools/fixtures/`.
 
 > `PORTFOLIO_MAIL_TRANSPORT=capture` simulates delivery into `storage/logs/captured/`.
 > Production always uses `native`; the dashboard warns loudly if anything else is set.

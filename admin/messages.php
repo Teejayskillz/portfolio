@@ -87,11 +87,22 @@ admin_header($page);
                 </thead>
                 <tbody>
                     <?php foreach ($messages as $message): ?>
-                        <?php $messageId = (int) $message['id']; $url = admin_url('message.php?id=' . $messageId); ?>
+                        <?php
+                        $messageId = (int) $message['id'];
+                        $url = admin_url('message.php?id=' . $messageId);
+                        $whatsappValue = trim((string) ($message['whatsapp'] ?? ''));
+                        $whatsappLink = $whatsappValue !== '' ? whatsapp_contact_url($whatsappValue) : '';
+                        ?>
                         <tr>
                             <td data-label="From">
                                 <a class="table__title" href="<?= e($url) ?>"><?= e((string) $message['name']) ?></a>
                                 <span class="table__meta"><?= e((string) $message['email']) ?></span>
+                                <?php if ($whatsappLink !== ''): ?>
+                                    <a class="table__meta" href="<?= e($whatsappLink) ?>" target="_blank" rel="noopener noreferrer"
+                                       title="Open WhatsApp chat">
+                                        <?= icon('whatsapp', 'icon', 12) ?> <?= e($whatsappValue) ?>
+                                    </a>
+                                <?php endif; ?>
                             </td>
                             <td data-label="Subject">
                                 <a href="<?= e($url) ?>" style="color: var(--text-soft)"><?= e(truncate_text((string) $message['subject'], 60)) ?></a>

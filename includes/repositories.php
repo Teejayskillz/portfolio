@@ -860,6 +860,7 @@ function admin_recent_projects(int $limit = 5): array
 /** @return array{rows:list<array<string,mixed>>, total:int} */
 function messages_page(int $page = 1, int $perPage = 20, string $search = ''): array
 {
+    $hasWhatsapp = ensure_contact_whatsapp_column();
     $page = max(1, $page);
     $perPage = max(1, min(100, $perPage));
     $offset = ($page - 1) * $perPage;
@@ -868,7 +869,15 @@ function messages_page(int $page = 1, int $perPage = 20, string $search = ''): a
     $params = [];
     if (trim($search) !== '') {
         $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], trim($search));
-        $where = " WHERE (name LIKE :search ESCAPE '\\' OR email LIKE :search ESCAPE '\\' OR subject LIKE :search ESCAPE '\\')";
+        $conditions = [
+            "name LIKE :search ESCAPE '\\'",
+            "email LIKE :search ESCAPE '\\'",
+            "subject LIKE :search ESCAPE '\\'",
+        ];
+        if ($hasWhatsapp) {
+            $conditions[] = "whatsapp LIKE :search ESCAPE '\\'";
+        }
+        $where = ' WHERE (' . implode(' OR ', $conditions) . ')';
         $params[':search'] = '%' . $escaped . '%';
     }
 
@@ -883,6 +892,8 @@ function messages_page(int $page = 1, int $perPage = 20, string $search = ''): a
 
 function message_by_id(int $id): ?array
 {
+    ensure_contact_whatsapp_column();
+
     return db_one('SELECT * FROM contact_messages WHERE id = :id', [':id' => $id]);
 }
 

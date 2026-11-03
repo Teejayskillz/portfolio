@@ -356,6 +356,7 @@ check('instant submission is treated as spam', $fast['status'] === 302 && str_co
 
 // Valid submission (after the minimum delay).
 $page = $anonymous->get('/');
+check('contact form exposes the optional WhatsApp field', str_contains($page['body'], 'name="whatsapp"'));
 $csrf = csrf_from($page['body']);
 $token = form_token_from($page['body']);
 sleep(3);
@@ -365,6 +366,7 @@ $valid = $anonymous->post('/contact.php', [
     'form_token' => $token,
     'name'       => 'Test Visitor',
     'email'      => $validEmail,
+    'whatsapp'   => '+234 903 555 0199',
     'subject'    => 'Valid enquiry ' . $suffix,
     'message'    => 'Hello, I would like to discuss a Django application for my business.',
 ]);
@@ -373,6 +375,19 @@ $stored = db_one('SELECT * FROM contact_messages WHERE email = :email ORDER BY i
 check('message stored in database', is_array($stored));
 check('mail delivery reported as sent (capture transport)', is_array($stored) && $stored['mail_status'] === 'sent', (string) ($stored['mail_status'] ?? 'missing'));
 check('message is linked to the client IP', is_array($stored) && $stored['ip_address'] !== '');
+check('optional WhatsApp number is stored', is_array($stored) && ($stored['whatsapp'] ?? '') === '+234 903 555 0199');
+
+$whatsappValidation = validate_contact([
+    'name' => 'Number Test', 'email' => 'number@example.test', 'subject' => 'Number check',
+    'message' => 'This message is long enough for validation.', 'whatsapp' => 'call me maybe',
+]);
+check('invalid WhatsApp number is rejected', isset($whatsappValidation['errors']['whatsapp']));
+$whatsappEmpty = validate_contact([
+    'name' => 'No Number', 'email' => 'nonumber@example.test', 'subject' => 'No number',
+    'message' => 'This message is long enough and has no WhatsApp number.',
+]);
+check('WhatsApp stays optional', !isset($whatsappEmpty['errors']['whatsapp']));
+check('WhatsApp link helper handles country code', str_contains(whatsapp_contact_url('0903 555 0199'), 'wa.me/2349035550199'));
 
 // Rate limit (3 messages per hour, we already stored spam + spam + valid).
 $page = $anonymous->get('/');
@@ -749,6 +764,7 @@ structure('messages', $messagesPage['body']);
 check('stored message appears in the inbox', is_array($storedMessage) && str_contains($messagesPage['body'], (string) $storedMessage['subject']));
 $messageView = $admin->get('/admin/message.php?id=' . (int) $storedMessage['id']);
 check('message detail renders', $messageView['status'] === 200 && str_contains($messageView['body'], 'Hello, I would like to discuss'));
+check('message detail shows the WhatsApp link', str_contains($messageView['body'], '+234 903 555 0199') && str_contains($messageView['body'], 'wa.me/2349035550199'));
 structure('message detail', $messageView['body']);
 $messageDelete = $admin->post('/admin/message.php', [
     'csrf_token' => csrf_from($messageView['body']),
@@ -857,6 +873,7 @@ $contact = $anonymous->post('/contact.php', [
     'form_token' => $token,
     'name'       => 'Visitor ' . $suffix,
     'email'      => $visitorEmail,
+    'whatsapp'   => '0803 555 0144',
     'subject'    => 'Dual email test ' . $suffix,
     'message'    => 'Please send both an owner notification and a visitor confirmation for this message.',
 ]);
@@ -878,6 +895,7 @@ foreach ($contactFiles as $file) {
 check('owner copy addressed to the notification email', $ownerMail !== '');
 check('visitor copy addressed to the visitor', $visitorMail !== '');
 check('owner copy includes the enquiry', str_contains($ownerMail, 'Dual email test ' . $suffix));
+check('owner notification includes the WhatsApp number', str_contains($ownerMail, 'WhatsApp: 0803 555 0144') && str_contains($ownerMail, 'wa.me/2348035550144'));
 check('confirmation renders placeholders', str_contains($visitorMail, 'Thanks for contacting TijaniDev') && str_contains($visitorMail, 'Visitor ' . $suffix));
 check('confirmation subject is applied', str_contains($visitorMail, $confirmationSubject));
 

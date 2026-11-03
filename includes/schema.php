@@ -103,6 +103,7 @@ return [
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         email TEXT NOT NULL,
+        whatsapp TEXT NOT NULL DEFAULT '',
         subject TEXT NOT NULL,
         message TEXT NOT NULL,
         ip_address TEXT NOT NULL DEFAULT '',

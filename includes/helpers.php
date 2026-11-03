@@ -336,17 +336,38 @@ function admin_url(string $path = ''): string
     return public_url('admin/' . $path);
 }
 
+/** Convert a typed number into wa.me digits (Nigerian 0… → 234…). */
+function whatsapp_digits(string $number): string
+{
+    $digits = (string) preg_replace('/\D+/', '', $number);
+
+    if ($digits === '') {
+        return '';
+    }
+    if (strlen($digits) === 11 && str_starts_with($digits, '0')) {
+        $digits = '234' . substr($digits, 1);
+    }
+
+    return $digits;
+}
+
+/** wa.me link for a number a visitor typed; empty string when unusable. */
+function whatsapp_contact_url(string $number, string $message = ''): string
+{
+    $digits = whatsapp_digits($number);
+    if ($digits === '' || strlen($digits) < 7) {
+        return '';
+    }
+
+    $url = 'https://wa.me/' . $digits;
+
+    return $message !== '' ? $url . '?text=' . rawurlencode($message) : $url;
+}
+
 /** Pre-filled WhatsApp conversation link for the owner's number. */
 function whatsapp_url(string $message = ''): string
 {
-    $number = preg_replace('/\D+/', '', (string) config('owner.whatsapp', ''));
-    if ($number === '') {
-        return '#';
-    }
-
-    $url = 'https://wa.me/' . $number;
-
-    return $message !== '' ? $url . '?text=' . rawurlencode($message) : $url;
+    return whatsapp_contact_url((string) config('owner.whatsapp', ''), $message) ?: '#';
 }
 
 function email_url(string $subject = '', string $body = ''): string

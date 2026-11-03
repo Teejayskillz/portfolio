@@ -78,26 +78,77 @@ function contact_rate_limited(string $ip): array
 }
 
 /**
+ * Older installs/backups predate the optional WhatsApp column. Add it lazily so
+ * restores keep working without a schema-version bump.
+ */
+function ensure_contact_whatsapp_column(): bool
+{
+    static $available = null;
+    if (is_bool($available)) {
+        return $available;
+    }
+
+    try {
+        $columns = db()->query('PRAGMA table_info(contact_messages)')->fetchAll();
+        $names = array_map(static fn (array $column): string => (string) $column['name'], $columns);
+
+        if (!in_array('whatsapp', $names, true)) {
+            db()->exec("ALTER TABLE contact_messages ADD COLUMN whatsapp TEXT NOT NULL DEFAULT ''");
+        }
+
+        $available = true;
+    } catch (Throwable $exception) {
+        app_log('contact', 'Could not add the whatsapp column', ['error' => $exception->getMessage()]);
+        $available = false;
+    }
+
+    return $available;
+}
+
+/**
  * Persist a submission (always stored so nothing is silently lost).
  *
- * @param array{name:string,email:string,subject:string,message:string} $data
+ * @param array{name:string,email:string,subject:string,message:string,whatsapp?:string} $data
  */
 function store_contact_message(array $data, string $status, string $ip, string $userAgent): int
 {
-    db_run(
-        'INSERT INTO contact_messages (name, email, subject, message, ip_address, user_agent, mail_status, created_at)
-         VALUES (:name, :email, :subject, :message, :ip, :ua, :status, :created)',
-        [
-            ':name'    => $data['name'],
-            ':email'   => $data['email'],
-            ':subject' => $data['subject'],
-            ':message' => $data['message'],
-            ':ip'      => $ip,
-            ':ua'      => mb_substr($userAgent, 0, 255),
-            ':status'  => $status,
-            ':created' => now_utc(),
-        ]
-    );
+    $whatsapp = trim((string) ($data['whatsapp'] ?? ''));
+    $hasWhatsapp = ensure_contact_whatsapp_column();
+
+    if ($hasWhatsapp) {
+        db_run(
+            'INSERT INTO contact_messages
+             (name, email, whatsapp, subject, message, ip_address, user_agent, mail_status, created_at)
+             VALUES (:name, :email, :whatsapp, :subject, :message, :ip, :ua, :status, :created)',
+            [
+                ':name'     => $data['name'],
+                ':email'    => $data['email'],
+                ':whatsapp' => mb_substr($whatsapp, 0, 30),
+                ':subject'  => $data['subject'],
+                ':message'  => $data['message'],
+                ':ip'       => $ip,
+                ':ua'       => mb_substr($userAgent, 0, 255),
+                ':status'   => $status,
+                ':created'  => now_utc(),
+            ]
+        );
+    } else {
+        // Read-only/failed migration: keep saving the message without the field.
+        db_run(
+            'INSERT INTO contact_messages (name, email, subject, message, ip_address, user_agent, mail_status, created_at)
+             VALUES (:name, :email, :subject, :message, :ip, :ua, :status, :created)',
+            [
+                ':name'    => $data['name'],
+                ':email'   => $data['email'],
+                ':subject' => $data['subject'],
+                ':message' => $data['message'],
+                ':ip'      => $ip,
+                ':ua'      => mb_substr($userAgent, 0, 255),
+                ':status'  => $status,
+                ':created' => now_utc(),
+            ]
+        );
+    }
 
     return (int) db()->lastInsertId();
 }

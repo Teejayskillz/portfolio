@@ -119,6 +119,7 @@ function validate_contact(array $input): array
 {
     $name = clean_single_line((string) ($input['name'] ?? ''));
     $email = trim((string) ($input['email'] ?? ''));
+    $whatsapp = clean_single_line((string) ($input['whatsapp'] ?? ''));
     $subject = clean_single_line((string) ($input['subject'] ?? ''));
     $message = clean_text((string) ($input['message'] ?? ''));
     $errors = [];
@@ -133,6 +134,15 @@ function validate_contact(array $input): array
         $errors['email'] = 'Please add an email address so I can reply.';
     } elseif (mb_strlen($email) > 190 || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
         $errors['email'] = 'That email address does not look valid.';
+    }
+
+    if ($whatsapp !== '') {
+        $digits = (string) preg_replace('/\D+/', '', $whatsapp);
+        $allowedCharacters = preg_match('/^[+0-9()\s.\-]+$/', $whatsapp) === 1;
+
+        if (mb_strlen($whatsapp) > 30 || !$allowedCharacters || mb_strlen($digits) < 7 || mb_strlen($digits) > 15) {
+            $errors['whatsapp'] = 'Enter a valid WhatsApp number, including country code (Nigerian 0… numbers are accepted).';
+        }
     }
 
     if ($subject === '') {
@@ -151,10 +161,11 @@ function validate_contact(array $input): array
 
     return [
         'data' => [
-            'name'    => $name,
-            'email'   => $email,
-            'subject' => $subject,
-            'message' => $message,
+            'name'     => $name,
+            'email'    => $email,
+            'whatsapp' => $whatsapp,
+            'subject'  => $subject,
+            'message'  => $message,
         ],
         'errors' => $errors,
     ];

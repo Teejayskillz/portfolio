@@ -36,6 +36,15 @@ $replySubject = 'Re: ' . (string) $message['subject'];
 $replyBody = "\n\n---\nOriginal message from " . $message['name'] . ' (' . format_datetime((string) $message['created_at']) . "):\n"
     . $message['message'];
 
+$whatsappValue = trim((string) ($message['whatsapp'] ?? ''));
+$whatsappLink = $whatsappValue !== ''
+    ? whatsapp_contact_url(
+        $whatsappValue,
+        'Hi ' . (string) $message['name'] . ', thanks for your message through the website. '
+        . 'I am replying about: ' . (string) $message['subject']
+    )
+    : '';
+
 $page = [
     'title'    => 'Message',
     'subtitle' => 'From ' . (string) $message['name'],
@@ -56,7 +65,12 @@ admin_header($page);
         </p>
     </div>
     <div class="page-head__actions">
-        <a class="btn btn--primary btn--sm" href="<?= e(email_url($replySubject, $replyBody)) ?>">
+        <?php if ($whatsappLink !== ''): ?>
+            <a class="btn btn--primary btn--sm" href="<?= e($whatsappLink) ?>" target="_blank" rel="noopener noreferrer">
+                <?= icon('whatsapp', 'icon', 14) ?> Chat on WhatsApp
+            </a>
+        <?php endif; ?>
+        <a class="btn btn--<?= $whatsappLink !== '' ? 'ghost' : 'primary' ?> btn--sm" href="<?= e(email_url($replySubject, $replyBody)) ?>">
             <?= icon('mail', 'icon', 14) ?> Reply by email
         </a>
         <?= admin_message_badge((string) $message['mail_status']) ?>
@@ -104,6 +118,18 @@ admin_header($page);
                 <div>
                     <dt>Email</dt>
                     <dd><a href="<?= e(email_url($replySubject, $replyBody)) ?>"><?= e((string) $message['email']) ?></a></dd>
+                </div>
+                <div>
+                    <dt>WhatsApp</dt>
+                    <dd>
+                        <?php if ($whatsappValue !== ''): ?>
+                            <a href="<?= e($whatsappLink) ?>" target="_blank" rel="noopener noreferrer">
+                                <?= e($whatsappValue) ?>
+                            </a>
+                        <?php else: ?>
+                            Not provided
+                        <?php endif; ?>
+                    </dd>
                 </div>
                 <div>
                     <dt>Received</dt>

@@ -215,7 +215,8 @@ In a **sub-directory** deployment, change `ErrorDocument 404 /404.php` in `.htac
    it from projects, deleting a category in use is refused until its projects are moved.
 5. **Email settings** — set your notification address, sender identity and the visitor
    confirmation, then send a test email.
-6. **Messages** shows every contact submission, including failed deliveries.
+6. **Messages** shows every contact submission, including failed deliveries and any optional
+   WhatsApp number the visitor provided (with a one-click chat link).
 
 Nothing on the public site is hardcoded: the home page, project index, detail pages and
 sitemap all read the database.

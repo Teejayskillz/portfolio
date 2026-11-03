@@ -40,7 +40,7 @@ function normalize_mail_body(string $body): string
 /**
  * Placeholder substitution for mail templates.
  *
- * Supported: {name} {email} {subject} {message} {owner_name} {site_name} {site_url}
+ * Supported: {name} {email} {whatsapp} {subject} {message} {owner_name} {site_name} {site_url}
  *
  * @param array<string, string> $variables
  */
@@ -60,6 +60,7 @@ function mail_template_variables(array $data): array
     return [
         'name'       => (string) ($data['name'] ?? ''),
         'email'      => (string) ($data['email'] ?? ''),
+        'whatsapp'   => (string) ($data['whatsapp'] ?? ''),
         'subject'    => (string) ($data['subject'] ?? ''),
         'message'    => (string) ($data['message'] ?? ''),
         'owner_name' => (string) config('owner.name', ''),
@@ -208,10 +209,18 @@ function send_contact_notification(
 ): array {
     $settings ??= mail_settings();
 
+    $whatsapp = trim((string) ($data['whatsapp'] ?? ''));
+    $whatsappLine = '';
+    if ($whatsapp !== '') {
+        $whatsappUrl = whatsapp_contact_url($whatsapp);
+        $whatsappLine = 'WhatsApp: ' . $whatsapp . ($whatsappUrl !== '' ? ' (' . $whatsappUrl . ')' : '') . "\n";
+    }
+
     $subject = 'Portfolio enquiry: ' . sanitize_mail_string($data['subject'], 120);
     $body = "New message from the website contact form.\n\n"
         . "Name:    {$data['name']}\n"
         . "Email:   {$data['email']}\n"
+        . $whatsappLine
         . "Subject: {$data['subject']}\n"
         . "Date:    " . gmdate('Y-m-d H:i:s') . " UTC\n"
         . 'IP:      ' . $ip . "\n"

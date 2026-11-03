@@ -228,6 +228,7 @@ admin_header($page);
                     <ul class="tech-pills">
                         <li class="tech-pills__item">{name}</li>
                         <li class="tech-pills__item">{email}</li>
+                        <li class="tech-pills__item">{whatsapp}</li>
                         <li class="tech-pills__item">{subject}</li>
                         <li class="tech-pills__item">{message}</li>
                         <li class="tech-pills__item">{owner_name}</li>

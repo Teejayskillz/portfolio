@@ -513,12 +513,26 @@ site_header($meta);
                             <?php endif; ?>
                         </div>
 
-                        <div class="<?= e($fieldClass('subject')) ?> field--full">
+                        <div class="<?= e($fieldClass('subject')) ?>">
                             <label for="contact-subject">Subject *</label>
                             <input type="text" id="contact-subject" name="subject" value="<?= e($old('subject')) ?>"
                                    placeholder="What's this about?" required minlength="3" maxlength="150">
                             <?php if ($error('subject') !== ''): ?>
                                 <p class="field__error"><?= e($error('subject')) ?></p>
+                            <?php endif; ?>
+                        </div>
+
+                        <div class="<?= e($fieldClass('whatsapp')) ?>">
+                            <label for="contact-whatsapp">
+                                WhatsApp
+                                <span class="optional">optional</span>
+                            </label>
+                            <input type="tel" id="contact-whatsapp" name="whatsapp" value="<?= e($old('whatsapp')) ?>"
+                                   placeholder="+234 803 123 4567" maxlength="30" inputmode="tel" autocomplete="tel">
+                            <?php if ($error('whatsapp') !== ''): ?>
+                                <p class="field__error"><?= e($error('whatsapp')) ?></p>
+                            <?php else: ?>
+                                <p class="field__hint">Optional. Include the country code, or a Nigerian number starting with 0.</p>
                             <?php endif; ?>
                         </div>
 
